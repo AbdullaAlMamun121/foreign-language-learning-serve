@@ -30,16 +30,21 @@ async function run() {
 
         const userCollections = client.db("learningSchool").collection("users");
 
-
+        // get all user by api
+        app.get('/users', async (req, res) => {
+            const result = await userCollections.find().toArray();
+            res.send(result);
+        })
+        // save user into database using email
         app.put('/users/:email', async (req, res) => {
             const email = req.params.email;
             const user = req.body;
-            const query = {email: email};
+            const query = { email: email };
             const options = { upsert: true };
             const updatedDoc = {
                 $set: user,
             }
-            const result = await userCollections.updateOne(query, updatedDoc,options);
+            const result = await userCollections.updateOne(query, updatedDoc, options);
             console.log(result);
             res.send(result)
         })
