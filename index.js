@@ -75,27 +75,59 @@ async function run() {
             next();
         }
 
-
-        // admin verification api
-        app.get('/users/admin/:email', jwtVerify, async (req, res) => {
-            const email = req.params.email;
-
-            if (req.decoded.email !== email) {
-                res.send({ admin: false })
-            }
-
-            const query = { email: email };
-            const user = await userCollections.findOne(query);
-            const result = { admin: user?.role === 'admin' };
-            res.send(result);
-
-        })
-
         // get all user by api
         app.get('/users', jwtVerify, verifyAdmin, async (req, res) => {
             const result = await userCollections.find().toArray();
             res.send(result);
         })
+
+        app.get('/users/admin/:email', jwtVerify, async (req, res) => {
+            const email = req.params.email;
+
+            if (req.decoded.email !== email) {
+                res.status(403).send({ admin: false, instructor: false });
+                return;
+            }
+
+            const query = { email: email };
+            const user = await userCollections.findOne(query);
+            let admin = false;
+            let instructor = false;
+
+            if (user) {
+                if (user.role === 'admin') {
+                    admin = true;
+                } else if (user.role === 'instructor') {
+                    instructor = true;
+                }
+            } 
+            res.send({ admin, instructor });
+        });
+
+
+        app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
+            const email = req.params.email;
+
+            if (req.decoded.email !== email) {
+                res.send({ instructor: false });
+                return;
+            }
+
+            const query = { email: email };
+            const user = await userCollections.findOne(query);
+            const isInstructor = user?.role === 'instructor';
+
+            const result = { instructor: isInstructor };
+            res.send(result);
+        });
+
+
+
+
+
+
+
+
         // save user into database using email
         app.put('/users/:email', async (req, res) => {
             const email = req.params.email;
