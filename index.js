@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const port = process.env.PORT || 5000;
 
@@ -8,9 +9,24 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// middleware for jwt token
+const jwtVerify = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'Unauthorized access' });
+    }
+    const token = authorization.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN, (error, decoded) => {
+        if (error) {
+            return res.status(401).send({ error: true, message: 'Unauthorized access' });
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uetnypa.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -30,6 +46,14 @@ async function run() {
 
         const userCollections = client.db("learningSchool").collection("users");
 
+        // JWT authentication key generated
+        app.post('/jwt', (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
+            res.send(token);
+
+        })
+
         // get all user by api
         app.get('/users', async (req, res) => {
             const result = await userCollections.find().toArray();
@@ -45,9 +69,32 @@ async function run() {
                 $set: user,
             }
             const result = await userCollections.updateOne(query, updatedDoc, options);
-            console.log(result);
             res.send(result)
-        })
+        });
+
+        // make user admin or instructor
+        app.patch('/users/:id/role', jwtVerify, async (req, res) => {
+            const id = req.params.id;
+            const { role } = req.body;
+            const filter = { _id: new ObjectId(id) };
+            let updatedRole = '';
+
+            if (role === 'admin' || role === 'instructor') {
+                const user = await userCollections.findOne(filter);
+                if (user.role !== role) {
+                    const updatedDoc = {
+                        $set: {
+                            role: role,
+                        },
+                    };
+                    const result = await userCollections.updateOne(filter, updatedDoc);
+                    updatedRole = role;
+                }
+            }
+
+            res.send({ role: updatedRole });
+        });
+
 
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
