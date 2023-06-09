@@ -174,11 +174,15 @@ async function run() {
             const result = await instructorCollections.insertOne(addClass)
             res.send(result)
         })
-        // get all class
+
+        // get all instructor
         app.get('/default/instructor', jwtVerify, async (req, res) => {
-            const result = await instructorCollections.find().toArray();
-            res.send(result)
+            const query = { role: 'instructor' };
+            const result = await userCollections.find(query).toArray();
+            res.send(result);
         });
+
+
         app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
             const result = await instructorCollections.find().toArray();
             res.send(result)
