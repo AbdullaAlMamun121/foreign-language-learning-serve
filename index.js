@@ -165,6 +165,7 @@ async function run() {
         });
 
 
+
         // Instructor all functionality here:
         // add class api
         app.post('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
@@ -179,7 +180,7 @@ async function run() {
             res.send(result)
         });
 
-        // make approved class or denied
+        // make approved or denied for class
         app.patch('/instructors/:id/status', jwtVerify, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const { status } = req.body;
@@ -202,6 +203,21 @@ async function run() {
             res.send({ status: updatedStatus });
         });
 
+        // update feedback fields 
+        app.patch('/instructors/:id', jwtVerify, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const { feedBack } = req.body;
+            console.log({feedBack})
+            const query = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    feedback: feedBack,
+                }
+            }
+
+            const result = await instructorCollections.updateOne(query, updatedDoc);
+            res.send(result);
+        })
 
 
 
