@@ -81,8 +81,8 @@ async function run() {
             const result = await userCollections.find().toArray();
             res.send(result);
         });
-         // get all class by admin
-         app.get('/classes', jwtVerify, verifyAdmin, async (req, res) => {
+        // get all class by admin
+        app.get('/classes', jwtVerify, verifyAdmin, async (req, res) => {
             const result = await instructorCollections.find().toArray();
             res.send(result)
         })
@@ -111,21 +111,21 @@ async function run() {
         });
 
 
-        // app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
-        //     const email = req.params.email;
+        app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
+            const email = req.params.email;
 
-        //     if (req.decoded.email !== email) {
-        //         res.send({ instructor: false });
-        //         return;
-        //     }
+            if (req.decoded.email !== email) {
+                res.send({ instructor: false });
+                return;
+            }
 
-        //     const query = { email: email };
-        //     const user = await userCollections.findOne(query);
-        //     const isInstructor = user?.role === 'instructor';
+            const query = { email: email };
+            const user = await userCollections.findOne(query);
+            const isInstructor = user?.role === 'instructor';
 
-        //     const result = { instructor: isInstructor };
-        //     res.send(result);
-        // });
+            const result = { instructor: isInstructor };
+            res.send(result);
+        });
 
 
         // save user into database using email
@@ -177,8 +177,32 @@ async function run() {
         app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
             const result = await instructorCollections.find().toArray();
             res.send(result)
-        })
-       
+        });
+
+        // make approved class or denied
+        app.patch('/instructors/:id/status', jwtVerify, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const { status } = req.body;
+            const filter = { _id: new ObjectId(id) };
+            let updatedStatus = '';
+
+            if (status === 'pending' || status === 'approved' || status === 'denied') {
+                const classes = await instructorCollections.findOne(filter);
+                if (classes.status !== status) {
+                    const updatedDoc = {
+                        $set: {
+                            status: status,
+                        },
+                    };
+                    const result = await instructorCollections.updateOne(filter, updatedDoc);
+                    updatedStatus = status;
+                }
+            }
+
+            res.send({ status: updatedStatus });
+        });
+
+
 
 
         await client.db("admin").command({ ping: 1 });
