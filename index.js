@@ -168,24 +168,34 @@ async function run() {
 
         // Instructor all functionality here:
         // add class api
+
+          //  show all class collection only instructors 
+          app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
+            const email = req.decoded.email;
+            const query = { email: email };
+            const result = await instructorCollections.find(query).toArray();
+            res.send(result)
+        });
+
+
         app.post('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
-            const addClass = req.body;
-            addClass.status = "pending";
-            const result = await instructorCollections.insertOne(addClass)
+            const addClassStatus = req.body;
+            addClassStatus.status = "pending";
+            const result = await instructorCollections.insertOne(addClassStatus)
             res.send(result)
         })
 
-        // get all instructor
-        app.get('/default/instructor', jwtVerify, async (req, res) => {
+        // get all instructor for showing instructor link 
+        app.get('/instructor/list', jwtVerify, async (req, res) => {
             const query = { role: 'instructor' };
             const result = await userCollections.find(query).toArray();
             res.send(result);
         });
-
-
-        app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
+      
+        // get all classes for showing class link 
+        app.get('/instructor/classes', jwtVerify, async (req, res) => {
             const result = await instructorCollections.find().toArray();
-            res.send(result)
+            res.send(result);
         });
 
         // make approved or denied for class
