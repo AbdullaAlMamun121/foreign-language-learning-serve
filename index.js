@@ -45,6 +45,7 @@ async function run() {
         // Send a ping to confirm a successful connection
 
         const userCollections = client.db("learningSchool").collection("users");
+        const instructorCollections = client.db("learningSchool").collection("instructors");
 
         // JWT authentication key generated
         app.post('/jwt', (req, res) => {
@@ -79,6 +80,11 @@ async function run() {
         app.get('/users', jwtVerify, verifyAdmin, async (req, res) => {
             const result = await userCollections.find().toArray();
             res.send(result);
+        });
+         // get all class by admin
+         app.get('/classes', jwtVerify, verifyAdmin, async (req, res) => {
+            const result = await instructorCollections.find().toArray();
+            res.send(result)
         })
 
         app.get('/users/admin/:email', jwtVerify, async (req, res) => {
@@ -100,32 +106,26 @@ async function run() {
                 } else if (user.role === 'instructor') {
                     instructor = true;
                 }
-            } 
+            }
             res.send({ admin, instructor });
         });
 
 
-        app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
-            const email = req.params.email;
+        // app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
+        //     const email = req.params.email;
 
-            if (req.decoded.email !== email) {
-                res.send({ instructor: false });
-                return;
-            }
+        //     if (req.decoded.email !== email) {
+        //         res.send({ instructor: false });
+        //         return;
+        //     }
 
-            const query = { email: email };
-            const user = await userCollections.findOne(query);
-            const isInstructor = user?.role === 'instructor';
+        //     const query = { email: email };
+        //     const user = await userCollections.findOne(query);
+        //     const isInstructor = user?.role === 'instructor';
 
-            const result = { instructor: isInstructor };
-            res.send(result);
-        });
-
-
-
-
-
-
+        //     const result = { instructor: isInstructor };
+        //     res.send(result);
+        // });
 
 
         // save user into database using email
@@ -163,6 +163,22 @@ async function run() {
 
             res.send({ role: updatedRole });
         });
+
+
+        // Instructor all functionality here:
+        // add class api
+        app.post('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
+            const addClass = req.body;
+            addClass.status = "pending";
+            const result = await instructorCollections.insertOne(addClass)
+            res.send(result)
+        })
+        // get all class
+        app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
+            const result = await instructorCollections.find().toArray();
+            res.send(result)
+        })
+       
 
 
         await client.db("admin").command({ ping: 1 });
