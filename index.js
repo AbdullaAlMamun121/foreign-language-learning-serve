@@ -175,6 +175,10 @@ async function run() {
             res.send(result)
         })
         // get all class
+        app.get('/default/instructor', jwtVerify, async (req, res) => {
+            const result = await instructorCollections.find().toArray();
+            res.send(result)
+        });
         app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
             const result = await instructorCollections.find().toArray();
             res.send(result)
