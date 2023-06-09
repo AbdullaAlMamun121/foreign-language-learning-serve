@@ -194,7 +194,8 @@ async function run() {
       
         // get all classes for showing class link 
         app.get('/instructor/classes', jwtVerify, async (req, res) => {
-            const result = await instructorCollections.find().toArray();
+            const query = {status:'approved'};
+            const result = await instructorCollections.find(query).toArray();
             res.send(result);
         });
 
