@@ -181,6 +181,13 @@ async function run() {
             res.send(result);
         });
 
+        // delete selected class
+        app.delete('/selectedClass/:id',jwtVerify,verifyStudent, async (req,res)=>{
+            const id = req.params.id;
+            const query ={_id:new ObjectId(id)}
+            const result = await classCollections.deleteOne(query);
+            res.send(result);
+        })
         // ----------------------
 
         // make user admin or instructor
