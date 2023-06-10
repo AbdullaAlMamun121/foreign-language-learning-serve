@@ -46,6 +46,7 @@ async function run() {
 
         const userCollections = client.db("learningSchool").collection("users");
         const instructorCollections = client.db("learningSchool").collection("instructors");
+        const classCollections = client.db("learningSchool").collection("selectedClasses");
 
         // JWT authentication key generated
         app.post('/jwt', (req, res) => {
@@ -75,6 +76,16 @@ async function run() {
             }
             next();
         }
+        // verify student middleware
+        const verifyStudent = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email };
+            const user = await classCollections.findOne(query);
+            if (user?.role !== 'student') {
+                return res.status(403).send({ error: true, message: 'forbidden' });
+            }
+            next();
+        }
 
         // get all user by api
 
@@ -96,7 +107,7 @@ async function run() {
             const email = req.params.email;
 
             if (req.decoded.email !== email) {
-                res.status(403).send({ admin: false, instructor: false });
+                res.status(403).send({ admin: false, instructor: false, student:false });
                 return;
             }
 
@@ -104,33 +115,36 @@ async function run() {
             const user = await userCollections.findOne(query);
             let admin = false;
             let instructor = false;
+            let student = false;
 
             if (user) {
                 if (user.role === 'admin') {
                     admin = true;
                 } else if (user.role === 'instructor') {
                     instructor = true;
+                } else if (user.role === 'student') {
+                    student = true;
                 }
             }
-            res.send({ admin, instructor });
+            res.send({ admin, instructor, student});
         });
 
 
-        app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
-            const email = req.params.email;
+        // app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
+        //     const email = req.params.email;
 
-            if (req.decoded.email !== email) {
-                res.send({ instructor: false });
-                return;
-            }
+        //     if (req.decoded.email !== email) {
+        //         res.send({ instructor: false });
+        //         return;
+        //     }
 
-            const query = { email: email };
-            const user = await userCollections.findOne(query);
-            const isInstructor = user?.role === 'instructor';
+        //     const query = { email: email };
+        //     const user = await userCollections.findOne(query);
+        //     const isInstructor = user?.role === 'instructor';
 
-            const result = { instructor: isInstructor };
-            res.send(result);
-        });
+        //     const result = { instructor: isInstructor };
+        //     res.send(result);
+        // });
 
 
         // save user into database using email
@@ -146,6 +160,28 @@ async function run() {
             const result = await userCollections.updateOne(query, updatedDoc, options);
             res.send(result)
         });
+
+        // -------------------------------------
+        // input selected class value
+        app.put('/selectedClass/:email', jwtVerify, async (req, res) => {
+            const email = req.params.email;
+            console.log(email)
+            const selectClass = req.body;
+            const query = { email: email };
+            const options = { upsert: true };
+            const updatedDoc = {
+                $setOnInsert: { role: 'student' },
+                $set: selectClass,
+            }
+            const result = await classCollections.updateOne(query, updatedDoc, options);
+            res.send(result)
+        });
+        app.get('/selectedClass', jwtVerify, verifyStudent, async (req, res) => {
+            const result = await classCollections.find().toArray();
+            res.send(result);
+        });
+
+        // ----------------------
 
         // make user admin or instructor
         app.patch('/users/:id/role', jwtVerify, async (req, res) => {
@@ -175,8 +211,8 @@ async function run() {
         // Instructor all functionality here:
         // add class api
 
-          //  show all class collection only instructors 
-          app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
+        //  show all class collection only instructors 
+        app.get('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
             const email = req.decoded.email;
             const query = { email: email };
             const result = await instructorCollections.find(query).toArray();
@@ -192,15 +228,15 @@ async function run() {
         })
 
         // get all instructor for showing instructor link 
-        app.get('/instructor/list', jwtVerify, async (req, res) => {
+        app.get('/instructor/list', async (req, res) => {
             const query = { role: 'instructor' };
             const result = await userCollections.find(query).toArray();
             res.send(result);
         });
-      
+
         // get all classes for showing class link 
-        app.get('/instructor/classes', jwtVerify, async (req, res) => {
-            const query = {status:'approved'};
+        app.get('/instructor/classes', async (req, res) => {
+            const query = { status: 'approved' };
             const result = await instructorCollections.find(query).toArray();
             res.send(result);
         });
@@ -232,7 +268,7 @@ async function run() {
         app.patch('/instructors/:id', jwtVerify, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const { feedBack } = req.body;
-            console.log({feedBack})
+            console.log({ feedBack })
             const query = { _id: new ObjectId(id) };
             const updatedDoc = {
                 $set: {
