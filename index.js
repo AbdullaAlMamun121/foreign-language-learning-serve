@@ -77,6 +77,11 @@ async function run() {
         }
 
         // get all user by api
+
+        app.get('/users/default', jwtVerify, async (req, res) => {
+            const result = await userCollections.find().toArray();
+            res.send(result);
+        });
         app.get('/users', jwtVerify, verifyAdmin, async (req, res) => {
             const result = await userCollections.find().toArray();
             res.send(result);
@@ -135,6 +140,7 @@ async function run() {
             const query = { email: email };
             const options = { upsert: true };
             const updatedDoc = {
+                $setOnInsert: { role: 'student' },
                 $set: user,
             }
             const result = await userCollections.updateOne(query, updatedDoc, options);
