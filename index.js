@@ -2,8 +2,14 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+// const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
+const Stripe = require('stripe');
+// NOTE: Without direct api in this page give me an error!!!!!
+const stripe = Stripe('sk_test_51NHnPSIkTkPcHPnMMaFpNc6Ki7LEzDoe1aimwa8s7wRRke2iMEGpV486Dr5jVZQ2p87SQxTpZvf96alGS4QIzyPj00JQcXz1oz');
 require('dotenv').config();
 const port = process.env.PORT || 5000;
+
+
 
 // middleware
 app.use(cors());
@@ -47,6 +53,7 @@ async function run() {
         const userCollections = client.db("learningSchool").collection("users");
         const instructorCollections = client.db("learningSchool").collection("instructors");
         const classCollections = client.db("learningSchool").collection("selectedClasses");
+        const paymentCollections = client.db("learningSchool").collection("payments");
 
         // JWT authentication key generated
         app.post('/jwt', (req, res) => {
@@ -107,7 +114,7 @@ async function run() {
             const email = req.params.email;
 
             if (req.decoded.email !== email) {
-                res.status(403).send({ admin: false, instructor: false, student:false });
+                res.status(403).send({ admin: false, instructor: false, student: false });
                 return;
             }
 
@@ -126,25 +133,8 @@ async function run() {
                     student = true;
                 }
             }
-            res.send({ admin, instructor, student});
+            res.send({ admin, instructor, student });
         });
-
-
-        // app.get('/users/instructor/:email', jwtVerify, verifyInstructor, async (req, res) => {
-        //     const email = req.params.email;
-
-        //     if (req.decoded.email !== email) {
-        //         res.send({ instructor: false });
-        //         return;
-        //     }
-
-        //     const query = { email: email };
-        //     const user = await userCollections.findOne(query);
-        //     const isInstructor = user?.role === 'instructor';
-
-        //     const result = { instructor: isInstructor };
-        //     res.send(result);
-        // });
 
 
         // save user into database using email
@@ -163,28 +153,34 @@ async function run() {
 
         // -------------------------------------
         // input selected class value
-        app.put('/selectedClass/:email', jwtVerify, async (req, res) => {
-            const email = req.params.email;
-            console.log(email)
+        // app.post('/selectedClass/:email', jwtVerify, async (req, res) => {
+        //     const email = req.params.email;
+        //     console.log(email)
+        //     const selectClass = req.body;
+        //     const query = { email: email };
+        //     const updatedDoc = {
+        //         $setOnInsert: { role: 'student' },
+        //         $set: selectClass,
+        //     }
+        //     const result = await classCollections.insertOne(query, updatedDoc);
+        //     res.send(result)
+        // });
+
+        app.post('/selectedClass', jwtVerify, async (req, res) => {
             const selectClass = req.body;
-            const query = { email: email };
-            const options = { upsert: true };
-            const updatedDoc = {
-                $setOnInsert: { role: 'student' },
-                $set: selectClass,
-            }
-            const result = await classCollections.updateOne(query, updatedDoc, options);
-            res.send(result)
+            const result = await classCollections.insertOne(selectClass);
+            res.send(result);
         });
-        app.get('/selectedClass', jwtVerify, verifyStudent, async (req, res) => {
+
+        app.get('/selectedClass', jwtVerify, async (req, res) => {
             const result = await classCollections.find().toArray();
             res.send(result);
         });
 
         // delete selected class
-        app.delete('/selectedClass/:id',jwtVerify,verifyStudent, async (req,res)=>{
+        app.delete('/selectedClass/:id', jwtVerify, verifyStudent, async (req, res) => {
             const id = req.params.id;
-            const query ={_id:new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const result = await classCollections.deleteOne(query);
             res.send(result);
         })
@@ -286,7 +282,45 @@ async function run() {
             const result = await instructorCollections.updateOne(query, updatedDoc);
             res.send(result);
         })
+        // Add instructor item updates
+        app.put('/updateMyClasses/:id', verifyInstructor, async (req, res) => {
+            const id = req.params.id;
+            console.log(id);
+            const body = req.body;
+            console.log(body)
+            console.log(body)
+            const filter = { _id: new ObjectId(id) };
+            const updateMyClass = {
+                $set: {
+                    className: body.className,
+                    email: body.email,
+                    price: parseFloat(body.price),
+                    seats: parseInt(body.seats),
+                }
+            };
+            const result = await instructorCollections.updateOne(filter, updateMyClass);
+            res.send(result);
+        })
+        //create payment intent
+        app.post('/create-payment-intent',jwtVerify, async (req, res) => {
+            const { price } = req.body;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            })
 
+        })
+        // payment api
+        app.post('/payments',jwtVerify, async (req,res)=>{
+            const payment = req.body;
+            const result = await paymentCollections.insertOne(payment);
+            res.send(result);
+        })
 
 
         await client.db("admin").command({ ping: 1 });
