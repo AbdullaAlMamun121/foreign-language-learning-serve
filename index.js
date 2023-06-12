@@ -9,11 +9,17 @@ const stripe = Stripe('sk_test_51NHnPSIkTkPcHPnMMaFpNc6Ki7LEzDoe1aimwa8s7wRRke2i
 require('dotenv').config();
 const port = process.env.PORT || 5000;
 
-
+const corsOptions = {
+    origin: '*',
+    credentials: true,
+    optionSuccessStatus: 200,
+}
 
 // middleware
-app.use(cors());
+app.use(cors(corsOptions))
 app.use(express.json());
+// middleware
+
 
 // middleware for jwt token
 const jwtVerify = (req, res, next) => {
@@ -41,7 +47,10 @@ const client = new MongoClient(uri, {
         version: ServerApiVersion.v1,
         strict: true,
         deprecationErrors: true,
-    }
+    },
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    maxPoolSize: 10,
 });
 
 async function run() {
@@ -151,20 +160,7 @@ async function run() {
             res.send(result)
         });
 
-        // -------------------------------------
-        // input selected class value
-        // app.post('/selectedClass/:email', jwtVerify, async (req, res) => {
-        //     const email = req.params.email;
-        //     console.log(email)
-        //     const selectClass = req.body;
-        //     const query = { email: email };
-        //     const updatedDoc = {
-        //         $setOnInsert: { role: 'student' },
-        //         $set: selectClass,
-        //     }
-        //     const result = await classCollections.insertOne(query, updatedDoc);
-        //     res.send(result)
-        // });
+
 
         app.post('/selectedClass', jwtVerify, async (req, res) => {
             const selectClass = req.body;
@@ -302,7 +298,7 @@ async function run() {
             res.send(result);
         })
         //create payment intent
-        app.post('/create-payment-intent',jwtVerify, async (req, res) => {
+        app.post('/create-payment-intent', jwtVerify, async (req, res) => {
             const { price } = req.body;
             const amount = price * 100;
             const paymentIntent = await stripe.paymentIntents.create({
@@ -316,11 +312,44 @@ async function run() {
 
         })
         // payment api
-        app.post('/payments',jwtVerify, async (req,res)=>{
+        app.post('/payments', jwtVerify, async (req, res) => {
             const payment = req.body;
             const result = await paymentCollections.insertOne(payment);
             res.send(result);
         })
+     
+        app.get('/payments', async (req, res) => {
+            try {
+                const { itemId } = req.query;
+
+                // Retrieve payment data
+                const payments = await paymentCollections.find({ itemId }).toArray();
+
+                // Retrieve instructor data for the matching itemId
+                const instructors = await instructorCollections.find({ itemId }).toArray();
+
+                // Merge the instructor information into the payment data
+                const result = payments.map((payment) => {
+                    const matchingInstructors = instructors.filter(
+                        (instructor) => instructor.itemId === payment.itemId
+                    );
+                    const mergedData = matchingInstructors.map((instructor) => ({
+                        instructorImage: instructor.instructorImage,
+                        image: instructor.image,
+                        className: instructor.className,
+                        email: instructor.email,
+                        ...payment,
+                    }));
+                    return mergedData;
+                }).flat();
+
+                res.send(result);
+            } catch (error) {
+                console.error('Error fetching payment data:', error);
+                res.status(500).send('Internal Server Error');
+            }
+        });
+
 
 
         await client.db("admin").command({ ping: 1 });
