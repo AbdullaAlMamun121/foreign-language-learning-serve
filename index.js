@@ -19,6 +19,13 @@ const corsOptions = {
 app.use(cors(corsOptions))
 app.use(express.json());
 // middleware
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    next();
+});
+
 
 
 // middleware for jwt token
@@ -56,8 +63,8 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        client.connect((err)=>{
-            if(err){
+        client.connect((err) => {
+            if (err) {
                 console.log(err);
                 return;
             }
@@ -101,7 +108,7 @@ async function run() {
         const verifyStudent = async (req, res, next) => {
             const email = req.decoded.email;
             const query = { email: email };
-            const user = await classCollections.findOne(query);
+            const user = await userCollections.findOne(query);
             if (user?.role !== 'student') {
                 return res.status(403).send({ error: true, message: 'forbidden' });
             }
@@ -167,17 +174,18 @@ async function run() {
 
 
 
-        app.post('/selectedClass', jwtVerify, async (req, res) => {
+        app.post('/selectedClass', jwtVerify,verifyStudent, async (req, res) => {
             const selectClass = req.body;
             const result = await classCollections.insertOne(selectClass);
             res.send(result);
         });
-
-        app.get('/selectedClass', jwtVerify, async (req, res) => {
-            const result = await classCollections.find().toArray();
+        app.get('/selectedClass', jwtVerify, verifyStudent, async (req, res) => {
+            const email = req.decoded.email;
+            const query = { email: email };
+            const result = await classCollections.find(query).toArray();
             res.send(result);
-        });
-
+          });
+          
         // delete selected class
         app.delete('/selectedClass/:id', jwtVerify, verifyStudent, async (req, res) => {
             const id = req.params.id;
@@ -225,6 +233,7 @@ async function run() {
 
 
         app.post('/instructors', jwtVerify, verifyInstructor, async (req, res) => {
+
             const addClassStatus = req.body;
             addClassStatus.status = "pending";
             const result = await instructorCollections.insertOne(addClassStatus)
@@ -285,6 +294,11 @@ async function run() {
         })
         // Add instructor item updates
         app.put('/updateMyClasses/:id', verifyInstructor, async (req, res) => {
+            // Set the necessary headers to allow cross-origin requests
+            res.setHeader('Access-Control-Allow-Origin', 'https://languagelearning-5d814.web.app');
+            res.setHeader('Access-Control-Allow-Methods', 'PUT');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
             const id = req.params.id;
             console.log(id);
             const body = req.body;
@@ -322,7 +336,7 @@ async function run() {
             const result = await paymentCollections.insertOne(payment);
             res.send(result);
         })
-     
+
         app.get('/payments', async (req, res) => {
             try {
                 const { itemId } = req.query;
